@@ -1,0 +1,85 @@
+"""Fake OCI resource objects and client used by the test suite.
+
+These intentionally implement only the attributes the ``formatters`` and
+``oci_client`` consumers actually read. No subclassing of real ``oci.*``
+classes — the goal is to keep tests independent of the SDK.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from app.formatters import IpRow
+
+
+@dataclass
+class FakeShapeConfig:
+    ocpus: float = 1.0
+    memory_in_gbs: float = 6.0
+
+
+@dataclass
+class FakeInstance:
+    id: str
+    display_name: str
+    lifecycle_state: str = "RUNNING"
+    shape: str = "VM.Standard.A1.Flex"
+    availability_domain: str = "AD-1"
+    shape_config: FakeShapeConfig | None = field(default_factory=FakeShapeConfig)
+
+
+@dataclass
+class FakeVnic:
+    id: str
+    subnet_id: str = "ocid1.subnet.oc1..fakesubnetid12345678"
+    private_ip: str = "10.0.0.10"
+    public_ip: str | None = "192.0.2.10"
+    is_primary: bool = True
+
+
+class FakeOciClient:
+    """In-memory stand-in for ``app.oci_client.OciClient``.
+
+    Tests construct one with a per-profile instance list and (optionally) a
+    VNIC map keyed by instance id.
+    """
+
+    def __init__(
+        self,
+        instances_by_profile: dict[str, list[FakeInstance]],
+        vnic_by_instance: dict[str, FakeVnic] | None = None,
+        default_profile: str = "default",
+    ) -> None:
+        self._instances = instances_by_profile
+        self._vnics = vnic_by_instance or {}
+        self._default = default_profile
+        self.list_instances_calls: list[str | None] = []
+        self.get_ip_info_calls: list[str] = []
+
+    @property
+    def profile_names(self) -> list[str]:
+        return list(self._instances.keys())
+
+    async def list_instances(self, profile: str | None = None) -> list[FakeInstance]:
+        self.list_instances_calls.append(profile)
+        target = profile or self._default
+        if target not in self._instances:
+            from app.oci_client import OciApiError
+
+            raise OciApiError(f"Unknown profile {target!r}")
+        return list(self._instances[target])
+
+    async def get_ip_info(
+        self, instance: FakeInstance, profile: str | None = None
+    ) -> IpRow:
+        self.get_ip_info_calls.append(instance.id)
+        vnic = self._vnics.get(instance.id)
+        return IpRow(
+            instance_name=instance.display_name,
+            instance_id=instance.id,
+            public_ip=vnic.public_ip if vnic else None,
+            private_ip=vnic.private_ip if vnic else None,
+            subnet_id=vnic.subnet_id if vnic else None,
+            vnic_id=vnic.id if vnic else None,
+            state=instance.lifecycle_state,
+        )
