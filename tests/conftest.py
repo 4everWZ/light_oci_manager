@@ -19,7 +19,7 @@ from app.config import (
 )
 from app.confirmations import ConfirmationStore
 from app.context import AppContext
-from tests.fakes.oci_fake import FakeInstance, FakeOciClient, FakeVnic
+from tests.fakes.oci_fake import FakeInstance, FakeLimitValue, FakeOciClient, FakeVnic
 
 
 @pytest.fixture
@@ -161,8 +161,43 @@ def fake_vnics() -> dict[str, FakeVnic]:
 def fake_oci(
     fake_instances: dict[str, list[FakeInstance]],
     fake_vnics: dict[str, FakeVnic],
+    fake_limits: dict[str, dict[str, list[FakeLimitValue]]],
 ) -> FakeOciClient:
-    return FakeOciClient(fake_instances, fake_vnics, default_profile="p1")
+    return FakeOciClient(
+        fake_instances,
+        fake_vnics,
+        default_profile="p1",
+        limits_by_profile=fake_limits,
+    )
+
+
+@pytest.fixture
+def fake_limits() -> dict[str, dict[str, list[FakeLimitValue]]]:
+    return {
+        "p1": {
+            "compute": [
+                FakeLimitValue("standard-a1-core-count", 8, "AD-1"),
+                FakeLimitValue("standard-a1-core-count", 4, "AD-2"),
+                FakeLimitValue("standard-a1-memory-count", 48, "AD-1"),
+                FakeLimitValue("vm-standard-e2-1-micro-count", 2),
+            ],
+            "vcn": [
+                FakeLimitValue("vcn-count", 5),
+                FakeLimitValue("public-ip-count", 10),
+            ],
+            "block-storage": [
+                FakeLimitValue("total-storage-tb", 200),
+                FakeLimitValue("volume-count", 32),
+            ],
+        },
+        "p2": {
+            "compute": [
+                FakeLimitValue("standard-a1-core-count", 1),
+            ],
+            "vcn": [],
+            "block-storage": [],
+        },
+    }
 
 
 @pytest.fixture

@@ -37,6 +37,14 @@ class FakeVnic:
     is_primary: bool = True
 
 
+@dataclass
+class FakeLimitValue:
+    name: str
+    value: int
+    availability_domain: str | None = None
+    scope_type: str = "REGION"
+
+
 class FakeOciClient:
     """In-memory stand-in for ``app.oci_client.OciClient``.
 
@@ -49,13 +57,16 @@ class FakeOciClient:
         instances_by_profile: dict[str, list[FakeInstance]],
         vnic_by_instance: dict[str, FakeVnic] | None = None,
         default_profile: str = "default",
+        limits_by_profile: dict[str, dict[str, list[FakeLimitValue]]] | None = None,
     ) -> None:
         self._instances = instances_by_profile
         self._vnics = vnic_by_instance or {}
         self._default = default_profile
+        self._limits = limits_by_profile or {}
         self.list_instances_calls: list[str | None] = []
         self.get_ip_info_calls: list[str] = []
         self.instance_action_calls: list[tuple[str, str, str | None]] = []
+        self.list_limit_values_calls: list[tuple[str, str | None]] = []
         # Tests can preload failures: instance_action_failures[instance_id] = OciApiError
         self.instance_action_failures: dict[str, Exception] = {}
 
@@ -111,3 +122,10 @@ class FakeOciClient:
         from app.oci_client import OciApiError
 
         raise OciApiError(f"Instance {instance_id} not found in profile {target_profile!r}")
+
+    async def list_limit_values(
+        self, service_name: str, profile: str | None = None
+    ) -> list[FakeLimitValue]:
+        self.list_limit_values_calls.append((service_name, profile))
+        target = profile or self._default
+        return list(self._limits.get(target, {}).get(service_name, []))
