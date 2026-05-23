@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.eggs/
+*.egg-info/
+build/
+dist/
+
+# uv
+.uv/
+uv.lock.bak
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Project-local runtime data
+data/
+logs/
+keys/
+config.yml
+*.local.yml
