@@ -13,8 +13,7 @@ from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
 
 from app import resource_match
-from app.audit import AuditLogger
-from app.commands.basic import _reply
+from app.commands import audit_err, audit_ok, reply
 from app.context import AppContext
 from app.formatters import (
     chunk_message,
@@ -43,15 +42,15 @@ def _instances(ctx: AppContext):
         try:
             profile = ctx.config.oci.get(profile_name)
         except ValueError as exc:
-            await _reply(update, str(exc))
-            await _audit_err(ctx.audit, update, "/instances", error=str(exc))
+            await reply(update, str(exc))
+            await audit_err(ctx.audit, update, "/instances", error=str(exc))
             return
 
         try:
             instances = await ctx.oci.list_instances(profile.name)
         except OciApiError as exc:
-            await _reply(update, exc.user_message())
-            await _audit_err(
+            await reply(update, exc.user_message())
+            await audit_err(
                 ctx.audit, update, "/instances", profile=profile.name, error=str(exc)
             )
             return
@@ -61,17 +60,17 @@ def _instances(ctx: AppContext):
         for page in paginate(instances, page_size):
             text = format_instances_page(profile.name, profile.region, page)
             for chunk in chunk_message(text):
-                await _reply(update, chunk)
+                await reply(update, chunk)
                 any_sent = True
         if not any_sent:
             # paginate() yields nothing when ``instances`` is empty; surface
             # the empty-state message explicitly.
-            await _reply(
+            await reply(
                 update,
                 format_instances_page(profile.name, profile.region, []),
             )
 
-        await _audit_ok(
+        await audit_ok(
             ctx.audit,
             update,
             "/instances",
@@ -86,17 +85,15 @@ def _instance(ctx: AppContext):
     async def handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         args = context.args or []
         if not args:
-            await _reply(
-                update, "Usage: /instance <name_or_short_id> [profile]"
-            )
+            await reply(update, "Usage: /instance <name_or_short_id> [profile]")
             return
         query = args[0]
         profile_name = args[1] if len(args) > 1 else None
         try:
             profile = ctx.config.oci.get(profile_name)
         except ValueError as exc:
-            await _reply(update, str(exc))
-            await _audit_err(ctx.audit, update, "/instance", error=str(exc))
+            await reply(update, str(exc))
+            await audit_err(ctx.audit, update, "/instance", error=str(exc))
             return
 
         try:
@@ -105,8 +102,8 @@ def _instance(ctx: AppContext):
                 query, instances, profile=profile.name, region=profile.region
             )
         except ResourceNotFound as exc:
-            await _reply(update, str(exc))
-            await _audit_err(
+            await reply(update, str(exc))
+            await audit_err(
                 ctx.audit, update, "/instance", profile=profile.name, error="not_found"
             )
             return
@@ -115,25 +112,25 @@ def _instance(ctx: AppContext):
                 f"{i + 1}. {c.display_name} ({mask_ocid(c.id)})"
                 for i, c in enumerate(exc.candidates)
             )
-            await _reply(
+            await reply(
                 update,
                 f"Ambiguous instance name {query!r}.\n{candidates}\n"
                 f"Use full name or short id.",
             )
-            await _audit_err(
+            await audit_err(
                 ctx.audit, update, "/instance", profile=profile.name, error="ambiguous"
             )
             return
         except OciApiError as exc:
-            await _reply(update, exc.user_message())
-            await _audit_err(
+            await reply(update, exc.user_message())
+            await audit_err(
                 ctx.audit, update, "/instance", profile=profile.name, error=str(exc)
             )
             return
 
         text = format_instance_summary(1, match)
-        await _reply(update, f"Profile: {profile.name}\nRegion: {profile.region}\n\n{text}")
-        await _audit_ok(
+        await reply(update, f"Profile: {profile.name}\nRegion: {profile.region}\n\n{text}")
+        await audit_ok(
             ctx.audit, update, "/instance", profile=profile.name, target=match.id
         )
 
@@ -148,15 +145,15 @@ def _public_ip(ctx: AppContext):
         try:
             profile = ctx.config.oci.get(profile_name)
         except ValueError as exc:
-            await _reply(update, str(exc))
-            await _audit_err(ctx.audit, update, "/public_ip", error=str(exc))
+            await reply(update, str(exc))
+            await audit_err(ctx.audit, update, "/public_ip", error=str(exc))
             return
 
         try:
             instances = await ctx.oci.list_instances(profile.name)
         except OciApiError as exc:
-            await _reply(update, exc.user_message())
-            await _audit_err(
+            await reply(update, exc.user_message())
+            await audit_err(
                 ctx.audit, update, "/public_ip", profile=profile.name, error=str(exc)
             )
             return
@@ -175,8 +172,8 @@ def _public_ip(ctx: AppContext):
                     )
                 ]
             except ResourceNotFound as exc:
-                await _reply(update, str(exc))
-                await _audit_err(
+                await reply(update, str(exc))
+                await audit_err(
                     ctx.audit,
                     update,
                     "/public_ip",
@@ -186,12 +183,12 @@ def _public_ip(ctx: AppContext):
                 return
             except AmbiguousResource as exc:
                 names = "\n".join(c.display_name for c in exc.candidates)
-                await _reply(
+                await reply(
                     update,
                     f"Ambiguous instance name {query!r}.\n{names}\n"
                     f"Use full name or short id.",
                 )
-                await _audit_err(
+                await audit_err(
                     ctx.audit,
                     update,
                     "/public_ip",
@@ -201,8 +198,8 @@ def _public_ip(ctx: AppContext):
                 return
 
         if not targets:
-            await _reply(update, "No instances found.")
-            await _audit_ok(ctx.audit, update, "/public_ip", profile=profile.name)
+            await reply(update, "No instances found.")
+            await audit_ok(ctx.audit, update, "/public_ip", profile=profile.name)
             return
 
         rows = []
@@ -211,7 +208,7 @@ def _public_ip(ctx: AppContext):
                 rows.append(await ctx.oci.get_ip_info(inst, profile.name))
             except OciApiError as exc:
                 rows.append(None)
-                await _audit_err(
+                await audit_err(
                     ctx.audit,
                     update,
                     "/public_ip",
@@ -226,8 +223,8 @@ def _public_ip(ctx: AppContext):
         )
         text = f"Profile: {profile.name}\nRegion: {profile.region}\n\n{body}"
         for chunk in chunk_message(text):
-            await _reply(update, chunk)
-        await _audit_ok(
+            await reply(update, chunk)
+        await audit_ok(
             ctx.audit,
             update,
             "/public_ip",
@@ -236,45 +233,3 @@ def _public_ip(ctx: AppContext):
         )
 
     return handler
-
-
-async def _audit_ok(
-    audit: AuditLogger,
-    update: Update,
-    command: str,
-    *,
-    profile: str | None = None,
-    target: str | None = None,
-    extra: dict | None = None,
-) -> None:
-    user = update.effective_user
-    await audit.record(
-        user_id=user.id if user else None,
-        username=user.username if user else None,
-        command=command,
-        profile=profile,
-        target=target,
-        result="ok",
-        extra=extra,
-    )
-
-
-async def _audit_err(
-    audit: AuditLogger,
-    update: Update,
-    command: str,
-    *,
-    profile: str | None = None,
-    target: str | None = None,
-    error: str | None = None,
-) -> None:
-    user = update.effective_user
-    await audit.record(
-        user_id=user.id if user else None,
-        username=user.username if user else None,
-        command=command,
-        profile=profile,
-        target=target,
-        result="error",
-        error=error,
-    )

@@ -3,9 +3,9 @@
 Spec §4.1: /start /help /status /ping /whoami.
 
 Each handler runs after the bot-level allowlist middleware in ``app.bot``,
-so ``ensure_authorized`` is *not* called again here. The exception is
-``/whoami``, which is intentionally exempt from the allowlist so unknown
-users can discover their Telegram ID and request access.
+so the allowlist is *not* re-checked here. The exception is ``/whoami``,
+which is intentionally exempt from the allowlist so unknown users can
+discover their Telegram ID and request access.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import time
 from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
 
-from app.audit import AuditLogger
+from app.commands import audit_ok, reply
 from app.context import AppContext
 
 HELP_TEXT = (
@@ -27,7 +27,15 @@ HELP_TEXT = (
     "/whoami — print your Telegram ID (use this to request allowlist access)\n"
     "/instances [profile] — list compute instances\n"
     "/instance <name|short-id> [profile] — show one instance\n"
-    "/public_ip [name|short-id] [profile] — show public/private IPs"
+    "/public_ip [name|short-id] [profile] — show public/private IPs\n"
+    "/start_instance <name|short-id> [profile] — power on an instance\n"
+    "/stop_instance <name|short-id> [profile] — graceful shutdown (with confirm)\n"
+    "/reboot_instance <name|short-id> [profile] — graceful reboot (with confirm)\n"
+    "/quota [profile] — show tenancy limits + compute usage\n"
+    "/security_lists [profile] — list security lists\n"
+    "/security_list <name|short-id> [profile] — show ingress rules\n"
+    "/boot_volumes [profile] — list boot volumes\n"
+    "/regions — list configured profile regions"
 )
 
 # Commands that bypass the allowlist. /whoami must be reachable by unknown
@@ -49,19 +57,19 @@ def _start(ctx: AppContext):
     async def handler(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         user = update.effective_user
         user_id = user.id if user else None
-        await _reply(
+        await reply(
             update,
             f"oci-helper-lite-tg v{ctx.version}\nYour Telegram ID: {user_id}\n\n{HELP_TEXT}",
         )
-        await _audit(ctx.audit, update, "/start")
+        await audit_ok(ctx.audit, update, "/start")
 
     return handler
 
 
 def _help(ctx: AppContext):
     async def handler(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-        await _reply(update, HELP_TEXT)
-        await _audit(ctx.audit, update, "/help")
+        await reply(update, HELP_TEXT)
+        await audit_ok(ctx.audit, update, "/help")
 
     return handler
 
@@ -78,8 +86,8 @@ def _status(ctx: AppContext):
             f"Default region: {region}\n"
             f"Loaded profiles: {profiles}"
         )
-        await _reply(update, text)
-        await _audit(ctx.audit, update, "/status")
+        await reply(update, text)
+        await audit_ok(ctx.audit, update, "/status")
 
     return handler
 
@@ -91,8 +99,8 @@ def _ping(ctx: AppContext):
         # Telegram stamped, not local wall clock.
         started = time.perf_counter()
         text = f"pong ({(time.perf_counter() - started) * 1000:.1f} ms)"
-        await _reply(update, text)
-        await _audit(ctx.audit, update, "/ping")
+        await reply(update, text)
+        await audit_ok(ctx.audit, update, "/ping")
 
     return handler
 
@@ -101,36 +109,16 @@ def _whoami(ctx: AppContext):
     async def handler(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         user = update.effective_user
         if user is None:
-            await _reply(update, "Your Telegram ID: unknown")
-            await _audit(ctx.audit, update, "/whoami", result="ok")
+            await reply(update, "Your Telegram ID: unknown")
+            await audit_ok(ctx.audit, update, "/whoami")
             return
         lines = [f"Your Telegram ID: {user.id}"]
         if user.username:
             lines.append(f"Username: @{user.username}")
-        await _reply(update, "\n".join(lines))
-        await _audit(ctx.audit, update, "/whoami")
+        await reply(update, "\n".join(lines))
+        await audit_ok(ctx.audit, update, "/whoami")
 
     return handler
 
 
-async def _reply(update: Update, text: str) -> None:
-    if update.effective_message is not None:
-        await update.effective_message.reply_text(text)
-
-
-async def _audit(
-    audit: AuditLogger,
-    update: Update,
-    command: str,
-    *,
-    result: str = "ok",
-    error: str | None = None,
-) -> None:
-    user = update.effective_user
-    await audit.record(
-        user_id=user.id if user else None,
-        username=user.username if user else None,
-        command=command,
-        result=result,
-        error=error,
-    )
+__all__ = ["HELP_TEXT", "PUBLIC_COMMANDS", "make_handlers"]
