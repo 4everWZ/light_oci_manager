@@ -45,6 +45,35 @@ class FakeLimitValue:
     scope_type: str = "REGION"
 
 
+@dataclass
+class FakePortRange:
+    min: int
+    max: int
+
+
+@dataclass
+class FakePortOptions:
+    destination_port_range: FakePortRange | None = None
+
+
+@dataclass
+class FakeIngressRule:
+    protocol: str  # "1" ICMP, "6" TCP, "17" UDP, "all"
+    source: str = "0.0.0.0/0"
+    source_type: str = "CIDR_BLOCK"
+    tcp_options: FakePortOptions | None = None
+    udp_options: FakePortOptions | None = None
+    is_stateless: bool = False
+    description: str | None = None
+
+
+@dataclass
+class FakeSecurityList:
+    id: str
+    display_name: str
+    ingress_security_rules: list[FakeIngressRule] = field(default_factory=list)
+
+
 class FakeOciClient:
     """In-memory stand-in for ``app.oci_client.OciClient``.
 
@@ -58,15 +87,19 @@ class FakeOciClient:
         vnic_by_instance: dict[str, FakeVnic] | None = None,
         default_profile: str = "default",
         limits_by_profile: dict[str, dict[str, list[FakeLimitValue]]] | None = None,
+        security_lists_by_profile: dict[str, list[FakeSecurityList]] | None = None,
     ) -> None:
         self._instances = instances_by_profile
         self._vnics = vnic_by_instance or {}
         self._default = default_profile
         self._limits = limits_by_profile or {}
+        self._security_lists = security_lists_by_profile or {}
         self.list_instances_calls: list[str | None] = []
         self.get_ip_info_calls: list[str] = []
         self.instance_action_calls: list[tuple[str, str, str | None]] = []
         self.list_limit_values_calls: list[tuple[str, str | None]] = []
+        self.list_security_lists_calls: list[str | None] = []
+        self.get_security_list_calls: list[tuple[str, str | None]] = []
         # Tests can preload failures: instance_action_failures[instance_id] = OciApiError
         self.instance_action_failures: dict[str, Exception] = {}
 
@@ -129,3 +162,24 @@ class FakeOciClient:
         self.list_limit_values_calls.append((service_name, profile))
         target = profile or self._default
         return list(self._limits.get(target, {}).get(service_name, []))
+
+    async def list_security_lists(
+        self, profile: str | None = None
+    ) -> list[FakeSecurityList]:
+        self.list_security_lists_calls.append(profile)
+        target = profile or self._default
+        return list(self._security_lists.get(target, []))
+
+    async def get_security_list(
+        self, security_list_id: str, profile: str | None = None
+    ) -> FakeSecurityList:
+        self.get_security_list_calls.append((security_list_id, profile))
+        target = profile or self._default
+        for sl in self._security_lists.get(target, []):
+            if sl.id == security_list_id:
+                return sl
+        from app.oci_client import OciApiError
+
+        raise OciApiError(
+            f"SecurityList {security_list_id} not found in profile {target!r}"
+        )

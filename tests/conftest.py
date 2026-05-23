@@ -19,7 +19,16 @@ from app.config import (
 )
 from app.confirmations import ConfirmationStore
 from app.context import AppContext
-from tests.fakes.oci_fake import FakeInstance, FakeLimitValue, FakeOciClient, FakeVnic
+from tests.fakes.oci_fake import (
+    FakeIngressRule,
+    FakeInstance,
+    FakeLimitValue,
+    FakeOciClient,
+    FakePortOptions,
+    FakePortRange,
+    FakeSecurityList,
+    FakeVnic,
+)
 
 
 @pytest.fixture
@@ -158,16 +167,75 @@ def fake_vnics() -> dict[str, FakeVnic]:
 
 
 @pytest.fixture
+def fake_security_lists() -> dict[str, list[FakeSecurityList]]:
+    return {
+        "p1": [
+            FakeSecurityList(
+                id="ocid1.securitylist.oc1.iad.fakedefaultsl12345abcd",
+                display_name="Default Security List",
+                ingress_security_rules=[
+                    FakeIngressRule(
+                        protocol="6",
+                        source="0.0.0.0/0",
+                        tcp_options=FakePortOptions(
+                            destination_port_range=FakePortRange(22, 22)
+                        ),
+                    ),
+                    FakeIngressRule(
+                        protocol="6",
+                        source="0.0.0.0/0",
+                        tcp_options=FakePortOptions(
+                            destination_port_range=FakePortRange(80, 80)
+                        ),
+                    ),
+                    FakeIngressRule(
+                        protocol="6",
+                        source="0.0.0.0/0",
+                        tcp_options=FakePortOptions(
+                            destination_port_range=FakePortRange(443, 443)
+                        ),
+                    ),
+                    FakeIngressRule(
+                        protocol="6",
+                        source="10.0.0.0/8",
+                        tcp_options=FakePortOptions(
+                            destination_port_range=FakePortRange(8088, 8088)
+                        ),
+                    ),
+                    FakeIngressRule(protocol="1", source="0.0.0.0/0"),
+                ],
+            ),
+            FakeSecurityList(
+                id="ocid1.securitylist.oc1.iad.fakeprivatesl99887000",
+                display_name="private-sl",
+                ingress_security_rules=[
+                    FakeIngressRule(
+                        protocol="17",
+                        source="10.0.0.0/16",
+                        udp_options=FakePortOptions(
+                            destination_port_range=FakePortRange(1000, 2000)
+                        ),
+                    ),
+                ],
+            ),
+        ],
+        "p2": [],
+    }
+
+
+@pytest.fixture
 def fake_oci(
     fake_instances: dict[str, list[FakeInstance]],
     fake_vnics: dict[str, FakeVnic],
     fake_limits: dict[str, dict[str, list[FakeLimitValue]]],
+    fake_security_lists: dict[str, list[FakeSecurityList]],
 ) -> FakeOciClient:
     return FakeOciClient(
         fake_instances,
         fake_vnics,
         default_profile="p1",
         limits_by_profile=fake_limits,
+        security_lists_by_profile=fake_security_lists,
     )
 
 
