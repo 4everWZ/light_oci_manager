@@ -55,6 +55,9 @@ class FakeOciClient:
         self._default = default_profile
         self.list_instances_calls: list[str | None] = []
         self.get_ip_info_calls: list[str] = []
+        self.instance_action_calls: list[tuple[str, str, str | None]] = []
+        # Tests can preload failures: instance_action_failures[instance_id] = OciApiError
+        self.instance_action_failures: dict[str, Exception] = {}
 
     @property
     def profile_names(self) -> list[str]:
@@ -83,3 +86,28 @@ class FakeOciClient:
             vnic_id=vnic.id if vnic else None,
             state=instance.lifecycle_state,
         )
+
+    async def instance_action(
+        self, instance_id: str, action: str, profile: str | None = None
+    ) -> FakeInstance:
+        """Record the call and mutate the instance's lifecycle_state.
+
+        Mirrors OCI's accepted state transitions enough for tests:
+        START → RUNNING, STOP/SOFTSTOP → STOPPED, RESET/SOFTRESET → RUNNING.
+        """
+        self.instance_action_calls.append((instance_id, action, profile))
+        if instance_id in self.instance_action_failures:
+            raise self.instance_action_failures[instance_id]
+        target_profile = profile or self._default
+        for inst in self._instances.get(target_profile, []):
+            if inst.id == instance_id:
+                if action == "START":
+                    inst.lifecycle_state = "RUNNING"
+                elif action in ("STOP", "SOFTSTOP"):
+                    inst.lifecycle_state = "STOPPED"
+                elif action in ("RESET", "SOFTRESET"):
+                    inst.lifecycle_state = "RUNNING"
+                return inst
+        from app.oci_client import OciApiError
+
+        raise OciApiError(f"Instance {instance_id} not found in profile {target_profile!r}")

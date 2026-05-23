@@ -22,7 +22,7 @@ from telegram.ext import (
     filters,
 )
 
-from app.commands import basic, instances
+from app.commands import basic, instances, operations
 from app.commands.basic import PUBLIC_COMMANDS
 from app.context import AppContext
 from app.security import check, unauthorized_message
@@ -46,6 +46,8 @@ def build(ctx: AppContext) -> Application:
     for handler in basic.make_handlers(ctx):
         app.add_handler(handler)
     for handler in instances.make_handlers(ctx):
+        app.add_handler(handler)
+    for handler in operations.make_handlers(ctx):
         app.add_handler(handler)
 
     app.add_error_handler(_error_handler(ctx))
