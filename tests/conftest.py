@@ -20,6 +20,7 @@ from app.config import (
 from app.confirmations import ConfirmationStore
 from app.context import AppContext
 from tests.fakes.oci_fake import (
+    FakeBootVolume,
     FakeIngressRule,
     FakeInstance,
     FakeLimitValue,
@@ -224,11 +225,33 @@ def fake_security_lists() -> dict[str, list[FakeSecurityList]]:
 
 
 @pytest.fixture
+def fake_boot_volumes() -> dict[str, list[FakeBootVolume]]:
+    return {
+        "p1": [
+            FakeBootVolume(
+                id="ocid1.bootvolume.oc1.iad.fakebootvol001aaaa",
+                display_name="bv-instance-20260331-2201",
+                size_in_gbs=50,
+            ),
+            FakeBootVolume(
+                id="ocid1.bootvolume.oc1.iad.fakebootvol002bbbb",
+                display_name="bv-instance-20260401-0900",
+                size_in_gbs=100,
+                availability_domain="AD-2",
+                lifecycle_state="AVAILABLE",
+            ),
+        ],
+        "p2": [],
+    }
+
+
+@pytest.fixture
 def fake_oci(
     fake_instances: dict[str, list[FakeInstance]],
     fake_vnics: dict[str, FakeVnic],
     fake_limits: dict[str, dict[str, list[FakeLimitValue]]],
     fake_security_lists: dict[str, list[FakeSecurityList]],
+    fake_boot_volumes: dict[str, list[FakeBootVolume]],
 ) -> FakeOciClient:
     return FakeOciClient(
         fake_instances,
@@ -236,6 +259,7 @@ def fake_oci(
         default_profile="p1",
         limits_by_profile=fake_limits,
         security_lists_by_profile=fake_security_lists,
+        boot_volumes_by_profile=fake_boot_volumes,
     )
 
 

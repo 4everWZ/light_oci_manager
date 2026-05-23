@@ -74,6 +74,15 @@ class FakeSecurityList:
     ingress_security_rules: list[FakeIngressRule] = field(default_factory=list)
 
 
+@dataclass
+class FakeBootVolume:
+    id: str
+    display_name: str
+    size_in_gbs: int = 50
+    lifecycle_state: str = "AVAILABLE"
+    availability_domain: str = "AD-1"
+
+
 class FakeOciClient:
     """In-memory stand-in for ``app.oci_client.OciClient``.
 
@@ -88,18 +97,21 @@ class FakeOciClient:
         default_profile: str = "default",
         limits_by_profile: dict[str, dict[str, list[FakeLimitValue]]] | None = None,
         security_lists_by_profile: dict[str, list[FakeSecurityList]] | None = None,
+        boot_volumes_by_profile: dict[str, list[FakeBootVolume]] | None = None,
     ) -> None:
         self._instances = instances_by_profile
         self._vnics = vnic_by_instance or {}
         self._default = default_profile
         self._limits = limits_by_profile or {}
         self._security_lists = security_lists_by_profile or {}
+        self._boot_volumes = boot_volumes_by_profile or {}
         self.list_instances_calls: list[str | None] = []
         self.get_ip_info_calls: list[str] = []
         self.instance_action_calls: list[tuple[str, str, str | None]] = []
         self.list_limit_values_calls: list[tuple[str, str | None]] = []
         self.list_security_lists_calls: list[str | None] = []
         self.get_security_list_calls: list[tuple[str, str | None]] = []
+        self.list_boot_volumes_calls: list[str | None] = []
         # Tests can preload failures: instance_action_failures[instance_id] = OciApiError
         self.instance_action_failures: dict[str, Exception] = {}
 
@@ -183,3 +195,10 @@ class FakeOciClient:
         raise OciApiError(
             f"SecurityList {security_list_id} not found in profile {target!r}"
         )
+
+    async def list_boot_volumes(
+        self, profile: str | None = None
+    ) -> list[FakeBootVolume]:
+        self.list_boot_volumes_calls.append(profile)
+        target = profile or self._default
+        return list(self._boot_volumes.get(target, []))
