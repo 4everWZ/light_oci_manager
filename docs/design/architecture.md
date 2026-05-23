@@ -1,6 +1,8 @@
-# oci-helper-lite-tg Architecture
+# light_oci_manager Architecture
 
-Reference: [`docs/specs/oci-helper-lite-tg-spec.md`](../specs/oci-helper-lite-tg-spec.md)
+Reference: [`docs/specs/00_overview.md`](../specs/00_overview.md)
+(original pre-implementation spec preserved at
+[`docs/specs/legacy/oci-helper-lite-tg-spec.md`](../specs/legacy/oci-helper-lite-tg-spec.md))
 
 ## Process model
 

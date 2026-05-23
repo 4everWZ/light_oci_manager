@@ -1,5 +1,3 @@
-下面这份可以直接作为 `docs/oci-helper-lite-tg-spec.md` 或交给 Codex/Claude Code 的实现规格。
-
 # oci-helper-lite-tg Spec v0.1
 
 ## 1. 目标

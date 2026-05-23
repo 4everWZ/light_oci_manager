@@ -1,6 +1,9 @@
 # Implementation Matrix
 
-Maps spec sections in [`docs/specs/oci-helper-lite-tg-spec.md`](specs/oci-helper-lite-tg-spec.md)
+Maps spec sections in [`docs/specs/`](specs/) (overview:
+[`00_overview.md`](specs/00_overview.md); legacy pre-implementation spec
+preserved at
+[`specs/legacy/oci-helper-lite-tg-spec.md`](specs/legacy/oci-helper-lite-tg-spec.md))
 to current implementation locations and verification status.
 
 Status legend:
