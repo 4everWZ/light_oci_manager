@@ -1,0 +1,40 @@
+# oci-helper-lite-tg example configuration.
+#
+# Copy this file to /home/ubuntu/oci-helper/config.yml (or your $HOST_OCI_HELPER_DIR)
+# and fill in real values. Keep file mode 0600.
+
+server:
+  host: "0.0.0.0"
+  port: 8818
+
+telegram:
+  bot_token: "REPLACE_ME:bot-token-from-BotFather"
+  # Telegram user IDs allowed to invoke commands. Use /whoami to find yours.
+  allowed_user_ids:
+    - 123456789
+
+oci:
+  default_profile: "oracle-sydney"
+  profiles:
+    oracle-sydney:
+      tenancy: "ocid1.tenancy.oc1..REPLACE"
+      user: "ocid1.user.oc1..REPLACE"
+      fingerprint: "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+      region: "ap-sydney-1"
+      key_file: "/app/oci-helper/keys/oci_api_key.pem"
+      compartment_id: "ocid1.compartment.oc1..REPLACE"
+
+    # Add additional profiles below by copying the block above.
+    # oracle-ashburn:
+    #   tenancy: "ocid1.tenancy.oc1..REPLACE"
+    #   user: "ocid1.user.oc1..REPLACE"
+    #   fingerprint: "aa:bb:cc:dd:..."
+    #   region: "us-ashburn-1"
+    #   key_file: "/app/oci-helper/keys/oci_api_key.pem"
+    #   compartment_id: "ocid1.compartment.oc1..REPLACE"
+
+runtime:
+  default_page_size: 20
+  command_timeout_sec: 30
+  confirmation_ttl_sec: 60
+  audit_log: "/app/oci-helper/logs/audit.log"

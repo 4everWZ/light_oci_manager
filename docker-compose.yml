@@ -1,0 +1,28 @@
+services:
+  oci-helper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: oci-helper-lite-tg:0.1.0
+    container_name: oci-helper
+    restart: always
+    ports:
+      - "127.0.0.1:8818:8818"
+    environment:
+      - TZ=Asia/Shanghai
+      - OCI_HELPER_CONFIG=/app/oci-helper/config.yml
+      - OCI_HELPER_LOG_LEVEL=INFO
+    volumes:
+      - ${HOST_OCI_HELPER_DIR:-/home/ubuntu/oci-helper}/config.yml:/app/oci-helper/config.yml:ro
+      - ${HOST_OCI_HELPER_DIR:-/home/ubuntu/oci-helper}/keys:/app/oci-helper/keys:ro
+      - ${HOST_OCI_HELPER_DIR:-/home/ubuntu/oci-helper}/logs:/app/oci-helper/logs
+      - ${HOST_OCI_HELPER_DIR:-/home/ubuntu/oci-helper}/data:/app/oci-helper/data
+    mem_limit: 256m
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8818/healthz', timeout=3).status==200 else 1)\""
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
